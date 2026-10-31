@@ -1,13 +1,12 @@
 
 {
-  "id": "./",
   "name": "Personal Finance Manager",
   "short_name": "My Finance",
-  "description": "Offline personal income and expense manager",
-  "start_url": "./",
+  "description": "Personal income, expense and budget tracker",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#f3f5fa",
   "theme_color": "#171d30",
   "icons": [
