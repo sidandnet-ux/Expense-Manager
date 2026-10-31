@@ -1,0 +1,411 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111827">
+<meta name="description" content="Private offline expense recorder">
+<title>My Expense Recorder</title>
+<link rel="manifest" href="./manifest.json">
+<style>
+:root {
+  --bg:#f3f5f9; --card:#fff; --text:#182235;
+  --muted:#718096; --primary:#6558df; --border:#e8eaf0;
+  --green:#11996b; --red:#dc5261;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+font-family:system-ui,-apple-system,sans-serif}
+header{background:#171d30;color:white;padding:22px max(18px,calc((100% - 1000px)/2))}
+header h1{margin:0;font-size:23px}
+header p{margin:5px 0 0;color:#b8bfd0;font-size:13px}
+main{max-width:1000px;margin:auto;padding:18px}
+.card{background:var(--card);border:1px solid var(--border);
+border-radius:15px;padding:17px;margin-bottom:15px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stat small{color:var(--muted)}
+.stat strong{display:block;font-size:22px;margin-top:7px;overflow-wrap:anywhere}
+.green{color:var(--green)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+input,select,textarea{width:100%;padding:11px;border:1px solid var(--border);
+border-radius:9px;background:white;color:var(--text);font:inherit;min-width:0}
+textarea{resize:vertical}
+button{border:0;border-radius:9px;padding:11px 15px;
+background:var(--primary);color:white;font-weight:600;cursor:pointer}
+button.secondary{background:#eef0f8;color:#343c57}
+button.danger{background:#fff0f0;color:var(--red)}
+button:disabled{opacity:.5}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+.section-title{font-size:17px;margin:0 0 14px}
+.expense{display:flex;justify-content:space-between;align-items:center;
+gap:12px;padding:13px 0;border-bottom:1px solid var(--border)}
+.expense:last-child{border:0}
+.expense strong{display:block}
+.expense small{color:var(--muted)}
+.amount{font-weight:700;white-space:nowrap}
+.pill{font-size:11px;background:#f0efff;color:#594bd0;
+padding:4px 8px;border-radius:20px;display:inline-block;margin-top:5px}
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+.toolbar>*{flex:1;min-width:125px}
+.empty{text-align:center;padding:25px;color:var(--muted)}
+h2{font-size:17px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:15px}
+#install{display:none}
+@media(max-width:600px){
+ main{padding:12px}
+ .stats{grid-template-columns:1fr 1fr}
+ .grid{grid-template-columns:1fr}
+ .stat strong{font-size:19px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>💰 My Expense Recorder</h1>
+  <p>Your money. Your records. Your device.</p>
+</header>
+
+<main>
+  <div class="actions" style="margin-bottom:14px">
+    <button id="install">Install App</button>
+    <button class="secondary" id="export">Export Backup</button>
+    <button class="secondary" id="importBtn">Import Backup</button>
+    <input type="file" id="importFile" accept=".json" hidden>
+  </div>
+
+  <section class="stats">
+    <div class="card stat">
+      <small>This month</small><strong id="monthTotal">₹0</strong>
+    </div>
+    <div class="card stat">
+      <small>Today</small><strong id="todayTotal">₹0</strong>
+    </div>
+    <div class="card stat">
+      <small>Total records</small><strong id="recordCount">0</strong>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 class="section-title" id="formTitle">Add New Expense</h2>
+    <form id="expenseForm">
+      <div class="grid">
+        <div>
+          <label for="amount">Amount *</label>
+          <input id="amount" type="number" min="0.01" step="0.01"
+          placeholder="Enter amount" required>
+        </div>
+        <div>
+          <label for="date">Date *</label>
+          <input id="date" type="date" required>
+        </div>
+        <div>
+          <label for="category">Category</label>
+          <select id="category"></select>
+        </div>
+        <div>
+          <label for="payment">Payment method</label>
+          <select id="payment">
+            <option>Cash</option><option>UPI</option>
+            <option>Credit Card</option><option>Debit Card</option>
+            <option>Bank Transfer</option><option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label for="note">Description / Notes</label>
+        <textarea id="note" rows="2" placeholder="What did you spend on?"></textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" id="saveBtn">Save Expense</button>
+        <button type="button" class="secondary" id="cancelEdit" hidden>Cancel Edit</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 class="section-title">Expense History</h2>
+    <div class="toolbar">
+      <input type="month" id="filterMonth" aria-label="Filter by month">
+      <select id="filterCategory"><option value="">All categories</option></select>
+      <select id="filterPayment">
+        <option value="">All payments</option>
+        <option>Cash</option><option>UPI</option>
+        <option>Credit Card</option><option>Debit Card</option>
+        <option>Bank Transfer</option><option>Other</option>
+      </select>
+    </div>
+    <div class="toolbar">
+      <input id="search" placeholder="Search expenses..." aria-label="Search">
+      <button class="secondary" id="clearFilters">Clear filters</button>
+    </div>
+    <div id="expenseList"></div>
+  </section>
+
+  <section class="card">
+    <h2 class="section-title">Spending by Category</h2>
+    <div id="categorySummary"></div>
+  </section>
+
+  <section class="card">
+    <h2 class="section-title">App Settings</h2>
+    <div class="grid">
+      <div>
+        <label for="currency">Currency symbol</label>
+        <input id="currency" maxlength="5" value="₹">
+      </div>
+      <div>
+        <label for="categories">Custom categories (comma separated)</label>
+        <input id="categories" placeholder="Food, Travel, Bills">
+      </div>
+    </div>
+    <div class="actions">
+      <button id="saveSettings">Save Settings</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted)">
+      Your data is saved locally in this browser. Export backups regularly.
+    </p>
+  </section>
+</main>
+
+<footer>Private Expense Recorder · Offline Ready · No Account Required</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const KEY = "expense_recorder_v1";
+const SETTINGS = "expense_recorder_settings_v1";
+const DEFAULT_CATEGORIES = [
+  "Food","Travel","Shopping","Groceries","Bills",
+  "Health","Entertainment","Education","Other"
+];
+
+let expenses = JSON.parse(localStorage.getItem(KEY) || "[]");
+let settings = JSON.parse(localStorage.getItem(SETTINGS) ||
+  '{"currency":"₹","categories":null}');
+let editing = null;
+let deferredInstall = null;
+
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+const categories = () => settings.categories?.length ?
+  settings.categories : DEFAULT_CATEGORIES;
+const money = n => (settings.currency || "₹") +
+  Number(n).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+const persist = () => localStorage.setItem(KEY,JSON.stringify(expenses));
+const monthNow = () => today().slice(0,7);
+
+function setupCategories(){
+  $("category").innerHTML = categories().map(c =>
+    `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join("");
+  $("filterCategory").innerHTML =
+    '<option value="">All categories</option>' +
+    categories().map(c => `<option>${escapeHTML(c)}</option>`).join("");
+  $("categories").value = categories().join(", ");
+  $("currency").value = settings.currency || "₹";
+}
+
+function escapeHTML(s){
+  return String(s).replace(/[&<>"']/g,c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function resetForm(){
+  editing = null;
+  $("expenseForm").reset();
+  $("date").value = today();
+  $("formTitle").textContent = "Add New Expense";
+  $("saveBtn").textContent = "Save Expense";
+  $("cancelEdit").hidden = true;
+}
+
+$("expenseForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const amount = Number($("amount").value);
+  if(!Number.isFinite(amount) || amount <= 0) return;
+
+  const record = {
+    id: editing || (crypto.randomUUID ? crypto.randomUUID() :
+      String(Date.now()) + Math.random()),
+    amount,
+    date:$("date").value,
+    category:$("category").value,
+    payment:$("payment").value,
+    note:$("note").value.trim()
+  };
+
+  if(editing){
+    expenses = expenses.map(x=>x.id===editing?record:x);
+  }else{
+    expenses.push(record);
+  }
+  persist();
+  resetForm();
+  render();
+});
+
+$("cancelEdit").onclick = resetForm;
+
+function editExpense(id){
+  const x=expenses.find(e=>e.id===id);
+  if(!x)return;
+  editing=id;
+  $("amount").value=x.amount;
+  $("date").value=x.date;
+  $("category").value=x.category;
+  $("payment").value=x.payment;
+  $("note").value=x.note;
+  $("formTitle").textContent="Edit Expense";
+  $("saveBtn").textContent="Update Expense";
+  $("cancelEdit").hidden=false;
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function deleteExpense(id){
+  if(!confirm("Delete this expense?"))return;
+  expenses=expenses.filter(x=>x.id!==id);
+  persist();
+  if(editing===id)resetForm();
+  render();
+}
+
+function filtered(){
+  const month=$("filterMonth").value;
+  const cat=$("filterCategory").value;
+  const pay=$("filterPayment").value;
+  const q=$("search").value.toLowerCase().trim();
+  return expenses.filter(x=>
+    (!month || x.date.startsWith(month)) &&
+    (!cat || x.category===cat) &&
+    (!pay || x.payment===pay) &&
+    (!q || [x.note,x.category,x.payment,x.date].join(" ").toLowerCase().includes(q))
+  ).sort((a,b)=>b.date.localeCompare(a.date));
+}
+
+function render(){
+  const list=filtered();
+  const currentMonth=monthNow();
+  const todayDate=today();
+
+  $("monthTotal").textContent=money(expenses.filter(x=>x.date.startsWith(currentMonth))
+    .reduce((s,x)=>s+x.amount,0));
+  $("todayTotal").textContent=money(expenses.filter(x=>x.date===todayDate)
+    .reduce((s,x)=>s+x.amount,0));
+  $("recordCount").textContent=expenses.length;
+
+  $("expenseList").innerHTML=list.length ? list.map(x=>`
+    <div class="expense">
+      <div style="min-width:0">
+        <strong>${escapeHTML(x.note || x.category)}</strong>
+        <small>${escapeHTML(x.date)} · ${escapeHTML(x.payment)}</small><br>
+        <span class="pill">${escapeHTML(x.category)}</span>
+      </div>
+      <div style="text-align:right">
+        <div class="amount">${money(x.amount)}</div>
+        <div class="actions" style="justify-content:flex-end;margin-top:6px">
+          <button class="secondary" data-edit="${escapeHTML(x.id)}">Edit</button>
+          <button class="danger" data-delete="${escapeHTML(x.id)}">Delete</button>
+        </div>
+      </div>
+    </div>`).join("") :
+    '<div class="empty">No expenses found. Add your first expense above!</div>';
+
+  const totals={};
+  list.forEach(x=>totals[x.category]=(totals[x.category]||0)+x.amount);
+  const sorted=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const max=sorted.length?sorted[0][1]:1;
+  $("categorySummary").innerHTML=sorted.length?sorted.map(([name,value])=>`
+    <div style="margin-bottom:13px">
+      <div style="display:flex;justify-content:space-between;font-size:13px">
+        <span>${escapeHTML(name)}</span><strong>${money(value)}</strong>
+      </div>
+      <div style="height:7px;background:#eee;border-radius:8px;margin-top:6px">
+        <div style="height:7px;width:${value/max*100}%;background:#6558df;border-radius:8px"></div>
+      </div>
+    </div>`).join(""):'<p class="empty">No spending data yet.</p>';
+}
+
+["filterMonth","filterCategory","filterPayment","search"].forEach(id=>
+  $(id).addEventListener("input",render));
+
+$("clearFilters").onclick=()=>{
+  $("filterMonth").value="";
+  $("filterCategory").value="";
+  $("filterPayment").value="";
+  $("search").value="";
+  render();
+};
+
+$("saveSettings").onclick=()=>{
+  const cats=$("categories").value.split(",").map(x=>x.trim()).filter(Boolean);
+  if(!cats.length){alert("Please enter at least one category.");return;}
+  settings={currency:$("currency").value.trim()||"₹",categories:[...new Set(cats)]};
+  localStorage.setItem(SETTINGS,JSON.stringify(settings));
+  setupCategories();
+  render();
+  alert("Settings saved!");
+};
+
+$("export").onclick=()=>{
+  const data={version:1,exportedAt:new Date().toISOString(),settings,expenses};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="expense-backup-"+today()+".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+$("importBtn").onclick=()=>$("importFile").click();
+$("importFile").onchange=async e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  try{
+    const data=JSON.parse(await file.text());
+    if(!Array.isArray(data.expenses) ||
+       !data.expenses.every(x=>x && typeof x.id==="string" &&
+       Number.isFinite(x.amount) && x.amount>0 &&
+       typeof x.date==="string" && typeof x.category==="string" &&
+       typeof x.payment==="string" && typeof x.note==="string")){
+      throw new Error("Invalid backup format");
+    }
+    if(!confirm("Replace current expenses with this backup?"))return;
+    expenses=data.expenses;
+    if(data.settings && typeof data.settings==="object")settings=data.settings;
+    persist();
+    localStorage.setItem(SETTINGS,JSON.stringify(settings));
+    setupCategories();
+    resetForm();
+    render();
+    alert("Backup imported successfully!");
+  }catch(err){alert("Could not import backup: "+err.message);}
+  finally{e.target.value="";}
+};
+
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault();
+  deferredInstall=e;
+  $("install").style.display="inline-block";
+});
+$("install").onclick=async()=>{
+  if(!deferredInstall)return;
+  deferredInstall.prompt();
+  await deferredInstall.userChoice;
+  deferredInstall=null;
+  $("install").style.display="none";
+};
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("./sw.js").catch(console.error);
+  });
+}
+
+$("date").value=today();
+setupCategories();
+render();
+</script>
+</body>
+</html>
