@@ -1,4 +1,3 @@
-
 const CACHE_NAME = "finance-manager-v1";
 
 const FILES = [
